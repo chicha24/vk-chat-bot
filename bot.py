@@ -1,4 +1,4 @@
-from os import close
+import os
 import vk_api, json, operator
 from functools import reduce
 from vk_api.exceptions import ApiError
@@ -19,8 +19,7 @@ def getFromDict(dataDict, mapList) -> reduce:
 
 def cleanUserIdFromMsgMention(msg) -> int:
     msg = event.message.text
-    msgArr = msg.split()
-    return int(''.join(i for i in msgArr[-1] if i.isdigit()))
+    return int(''.join(i for i in msg if i.isdigit()))
 
 
 def appendChatJSON(newData):
@@ -42,11 +41,7 @@ def appendToFaggotsJSON(newData, chatID):
 def deleteFromFaggotsJSON(userId):
     with open('chatLists.json', 'r+') as cl:
         dataLoaded = json.load(cl)
-        newElements = {id: num for id, num in dataLoaded['chats']['chat{}'.format(event.chat_id)]['faggots'].items() if
-                       num['id'] != userId}
-        print(newElements)
-        dataLoaded['chats']['chat{}'.format(event.chat_id)]['faggots'].clear()
-        dataLoaded['chats']['chat{}'.format(event.chat_id)]['faggots'].update(newElements)
+        del dataLoaded['chats']['chat{}'.format(event.chat_id)]['faggots']['user{}'.format(userId)]
         cl.seek(0)
         json.dump(dataLoaded, cl, indent=4)
 
@@ -77,6 +72,13 @@ vk_session = vk_api.VkApi(token=token)
 vk = vk_session.get_api()
 longpoll = VkBotLongPoll(vk_session, group_id)
 
+if not os.path.exists('chatLists.json'):
+    startDict = {
+        'chats': {
+
+        }
+    }
+
 for event in longpoll.listen():
     users = vk.messages.getConversationMembers(peer_id=event.message.peer_id, group_id=group_id)
     conversation = vk.messages.getConversationsById(peer_ids=event.message.peer_id, group_id=group_id)
@@ -93,9 +95,6 @@ for event in longpoll.listen():
                     if u['member_id'] == event.message.from_id:
                         admin = u.get('is_admin', False)
                         if admin:
-                            # msg = event.message.text
-                            # msgArr = msg.split()
-                            # cleanUserId = int(''.join(i for i in msgArr[-1] if i.isdigit()))
                             try:
                                 vk.messages.removeChatUser(chat_id=event.chat_id,
                                                            user_id=cleanUserIdFromMsgMention(event.message.text))
@@ -113,6 +112,7 @@ for event in longpoll.listen():
                         if admin:
                             sendMessage('Успешно начал работу!', event.chat_id)
                             data = {'chat{}'.format(event.chat_id): {
+                                'is_muted': 'False',
                                 'faggots': {
 
                                 }
