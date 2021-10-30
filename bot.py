@@ -19,7 +19,8 @@ def getFromDict(dataDict, mapList) -> reduce:
 
 def cleanUserIdFromMsgMention(msg) -> int:
     msg = event.message.text
-    return int(''.join(i for i in msg if i.isdigit()))
+    msgArr = msg.split()
+    return int(''.join(i for i in msgArr[-1] if i.isdigit()))
 
 
 def appendChatJSON(newData):
@@ -39,10 +40,12 @@ def appendToFaggotsJSON(newData, chatID):
 
 
 def deleteFromFaggotsJSON(userId):
-    with open('chatLists.json', 'r+') as cl:
+    with open('chatLists.json', 'r') as cl:
         dataLoaded = json.load(cl)
-        del dataLoaded['chats']['chat{}'.format(event.chat_id)]['faggots']['user{}'.format(userId)]
-        cl.seek(0)
+
+    del dataLoaded['chats']['chat{}'.format(event.chat_id)]['faggots']['user{}'.format(userId)]
+
+    with open('chatLists.json', 'w') as cl:
         json.dump(dataLoaded, cl, indent=4)
 
 
@@ -78,6 +81,8 @@ if not os.path.exists('chatLists.json'):
 
         }
     }
+    with open('chatLists.json', 'w') as cl:
+        json.dump(startDict, cl, indent=4)
 
 for event in longpoll.listen():
     users = vk.messages.getConversationMembers(peer_id=event.message.peer_id, group_id=group_id)
@@ -90,6 +95,8 @@ for event in longpoll.listen():
             except:
                 actionType = ''
                 actionUserId = -100
+            if actionType == 'chat_kick_user':
+                vk.messages.removeChatUser(chat_id=event.chat_id, user_id=actionUserId)
             if "чича кик" in event.message.text.lower():
                 for u in users['items']:
                     if u['member_id'] == event.message.from_id:
@@ -102,15 +109,11 @@ for event in longpoll.listen():
                                 sendMessage('Указаный пользователь отсутствует', event.chat_id)
                         else:
                             sendMessage('Недостаточно прав', event.chat_id)
-            if actionType == 'chat_kick_user':
-                vk.messages.removeChatUser(chat_id=event.chat_id, user_id=actionUserId)
-
-            if "чича стартуй" in event.message.text.lower():
+            elif "чича стартуй" in event.message.text.lower():
                 for u in users['items']:
                     if u['member_id'] == event.message.from_id:
                         admin = u.get('is_admin', False)
                         if admin:
-                            sendMessage('Успешно начал работу!', event.chat_id)
                             data = {'chat{}'.format(event.chat_id): {
                                 'is_muted': 'False',
                                 'faggots': {
@@ -119,7 +122,8 @@ for event in longpoll.listen():
                             }
                             }
                             appendChatJSON(data)
-            if "чича добавить пидораса" in event.message.text.lower():
+                            sendMessage('Успешно начал работу!', event.chat_id)
+            elif "чича добавить пидораса" in event.message.text.lower():
                 for u in users['items']:
                     if u['member_id'] == event.message.from_id:
                         admin = u.get('is_admin', False)
@@ -135,7 +139,7 @@ for event in longpoll.listen():
                                 event.chat_id)
                         else:
                             sendMessage('Недостаточно прав', event.chat_id)
-            if "чича покажи пидорасов" in event.message.text.lower() or "чича показать пидорасов" in event.message.text.lower():
+            elif "чича покажи пидорасов" in event.message.text.lower() or "чича показать пидорасов" in event.message.text.lower():
                 faglist = []
                 with open('chatLists.json', 'r') as cl:
                     data = json.load(cl)
@@ -146,11 +150,10 @@ for event in longpoll.listen():
                 for key, value in fagJSON.items():
                     faglist.append(getUserName(value['id'], vk))
                 sendMessage(appendArrToMsg(faglist, fagmsg), event.chat_id)
-            if "чича удалить пидораса" in event.message.text.lower() or "чича убрать из пидорасов" in event.message.text.lower():
+            elif "чича удалить пидораса" in event.message.text.lower() or "чича убрать из пидорасов" in event.message.text.lower():
                 try:
                     deleteFromFaggotsJSON(cleanUserIdFromMsgMention(event.message.text))
-                    sendMessage('{} успешно вынесен из списка пидорасов'.format(
-                        getUserName(cleanUserIdFromMsgMention(event.message.text), vk)))
-                except Exception as ex:
-                    sendMessage('Пользователь не найден в списке.{}'.format(ex.message), event.chat_id)
-                    print(cleanUserIdFromMsgMention(event.message.text))
+                    userName = getUserName(cleanUserIdFromMsgMention(event.message.text), vk)
+                    sendMessage('{} успешно вынесен из списка пидорасов'.format(userName), event.chat_id)
+                except:
+                    sendMessage('Пользователь не найден', event.chat_id)
